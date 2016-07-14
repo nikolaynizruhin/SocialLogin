@@ -1,0 +1,48 @@
+<?php
+namespace App;
+
+use Exception;
+use Socialite;
+use App\Exceptions\SocialAuthException;
+
+class LoginUser
+{
+
+    /**
+     * Authenticate
+     *
+     * @param string $provider
+     */
+    public function authenticate($provider)
+    {
+        return Socialite::driver($provider)->redirect();
+    }
+
+    /**
+     * Login
+     *
+     * @param string $provider
+     */
+    public function login($provider)
+    {
+        try {
+            $socialUserInfo = Socialite::driver($provider)->user();
+
+            $user = User::firstOrCreate(['email' => $socialUserInfo->getEmail()]);
+
+            if (is_null($user->socialProfile)) {
+                $socialProfile = new SocialLoginProfile;
+                $user->socialProfile()->save($socialProfile);
+            }
+
+            $providerField = "{$provider}_id";
+            $user->socialProfile->$providerField = $socialUserInfo->getId();
+            $user->socialProfile->save();
+
+            auth()->login($user);
+
+        } catch (Exception $e) {
+            throw new SocialAuthException("failed to authenticate with $provider");
+        }
+    }
+}
